@@ -1,0 +1,1 @@
+Usage like pytorch ... (passing layer during class call)
