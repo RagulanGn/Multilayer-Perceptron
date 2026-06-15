@@ -1,2 +1,0 @@
-Need to check with activation function = sigmoid 
-Because the (in, out) in of the matrix should not be previous.nb_neuron but current.input.shape
