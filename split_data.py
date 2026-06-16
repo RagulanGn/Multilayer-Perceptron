@@ -1,42 +1,30 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-def soft_max():
-	return
-
-def data_vis(df):
-	# print(df)
-	df1 = df.iloc[:,21:]
-	df1 = df
-	print(df1.describe().to_string())
-
-	# print(df.groupby(1).mean())
-	# print(df.groupby(1).median())
-
-	# sns.pairplot(df,hue=1)
-	# plt.savefig("pair_plot.png")
-	# plt.show()
+#Split data finished a lot of the work is in the dataloader on the train.py file
 
 def main():
-	df = pd.read_csv("data.csv", header=None)
+	"Read the data.csv, and separate the dataset into two, training and validation with 80/20 ratio"
+	try : 
+		df = pd.read_csv("datasets/data.csv", header=None)
+	except Exception as e:
+		print(f"Error reading the file {e}")
+	
+	#Remove the first columns which is ID
 	df = df.iloc[:, 1:]
 
-	data_vis(df)
+	#Transform label into boolean (int)
+	df = pd.get_dummies(df, columns=[1], dtype=int)
 
-	#Separation 50/50 pour le dataset (train/test)
-	df_train = df[:int(0.5 * len(df.index))]
-	df_test = df[int(0.5 * len(df.index)):]
-	print(f"df train{df_train.iloc[:, 1:].shape}")
-	#Standardization
-	df_train.iloc[:, 1:] = (df_train.iloc[:, 1:] - df_train.iloc[:, 1:].mean()) / df_train.iloc[:, 1:].std()
-	df_test.iloc[:, 1:] = (df_test.iloc[:, 1:] - df_train.iloc[:, 1:].mean()) / df_train.iloc[:, 1:].std()
+	#Can shuffle before split if wanted
+	# data_shuffled = np.random.permutation(data)
 
-	df_train = pd.get_dummies(df_train, columns=[1], dtype=int)
-	df_test = pd.get_dummies(df_test, columns=[1], dtype=int)
+	#Split the dataset into 80/20 (train/test)
+	df_train = df[:int(0.8 * len(df.index))]
+	df_val = df[int(0.8 * len(df.index)):]
 
-	df_train.to_csv("data_train.csv")
-	df_test.to_csv("data_test.csv")
+	#Export to csv
+	df_train.to_csv("datasets/data_train.csv")
+	df_val.to_csv("datasets/data_val.csv")
 	return
 
 if __name__ == "__main__":

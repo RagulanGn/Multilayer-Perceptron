@@ -1,188 +1,249 @@
 import pandas as pd
 import numpy as np
 import argparse
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+from ft_function import binary_cross_entropy, softmax, ReLU
+from autograd import Value
+from early_stopping import EarlyStopping
+from optimizer import NesterovMomentum, Adam
+
+np.random.seed(42) #Set the seed for the whole project
 
 class layer():
-	def __init__(self, in_size, nb_neuron, activation_function, activation_function_dx):
+	def __init__(self, in_size, nb_neuron, activation_function):
 		self.in_size = in_size
 		self.nb_neuron = nb_neuron
-		# self.weight = np.random.randint(10, size=(nb_neuron, in_size)) + 1		# Need to update th weight in a good way 
-		self.weight = np.random.normal(0, np.sqrt(2 / in_size), size=(nb_neuron, in_size))
-		self.bias = np.zeros(nb_neuron)
+		self.weight = Value(np.random.normal(0, np.sqrt(2 / (in_size + nb_neuron)), size=(nb_neuron, in_size)))
+		self.bias = Value(np.zeros(nb_neuron))
 		self.activation_function = activation_function
-		self.activation_function_dx = activation_function_dx
+
+	def parameters(self):
+		return [self.weight, self.bias]
 
 class model():
-	def __init__(self, loss_function, loss_function_dx, epoch, data, y):
+	def __init__(self, epoch, learning_rate, batch_size, dataloader, loss_function):
 		self.layer_list = []
-		self.loss_function = loss_function
-		self.loss_function_dx = loss_function_dx
 		self.epoch = epoch
-  
-		self.data = data[:int(len(data) * 0.8)]
-		self.data_val = data[int(len(data) * 0.8):]
-		self.y = y[:int(len(data) * 0.8)]
-		self.y_val = y[int(len(data) * 0.8):]
+		self.learning_rate = learning_rate
+		self.batch_size = batch_size
+		self.dataloader = dataloader
+		self.loss_function = loss_function
 
-	def add_layer(self, nb_neuron, activation_function, activation_function_dx):
+		self.validation_loss = []
+		self.training_loss = []
+		self.validation_acc = []
+		self.training_acc = []
+
+	def add_layer(self, nb_neuron, activation_function):
 		if not self.layer_list :
-			l = layer(len(self.data.columns), nb_neuron, activation_function, activation_function_dx)
+			l = layer(31, nb_neuron, activation_function) #HARDCODED
 		else :
-			l = layer(self.layer_list[-1].nb_neuron, nb_neuron, activation_function, activation_function_dx)
+			l = layer(self.layer_list[-1].nb_neuron, nb_neuron, activation_function)
 		self.layer_list.append(l)
 		return (l)
 
-	def train(self):
-		lr = 0.01																								#learning rate
+	def train(self, optimizer=None, EarlyStop=None):
 		i = 0
-		self.epoch = 1 #To remove (for testing)
+		data, y = self.dataloader.train_dataloader()
 		while (i < self.epoch):
-			prediction = self.feed_forward(self.data)
+			indices = np.random.permutation(len(data))
+			data = data[indices]
+			y = y[indices]
+			loss_batch = []
+			acc_batch = []
+			for j in range(0, len(data), self.batch_size):
+				batch = Value(data[j:j + self.batch_size])
+				batch_y = Value(y[j:j + self.batch_size])
 
-			self.back_propagation(prediction, lr)
-			val_loss = self.validation_step()
-			if i % 100 == 0:
-				loss = np.mean(self.loss_function(prediction, self.y))
-				print(f"Epoch {i}, Loss: {loss:.4f}")
+				#Feed Forward
+				prediction = self.feed_forward(batch)
+				loss = self.loss_function(prediction, batch_y)
+
+				#Back Propagation
+
+				for p in self.parameters():
+					p._grad = np.zeros_like(p.number)
+
+				loss.backward()
+				if optimizer == None :
+					self.back_propagation(self.learning_rate)
+				else :
+					optimizer(self.parameters())
+				#Appends Metrics
+				loss_batch.append(loss.number)
+				pred_labels = prediction.number.argmax(axis=1)
+				true_labels = batch_y.number.argmax(axis=1)
+				acc_batch.append((pred_labels == true_labels).mean())
+
+			self.training_loss.append(np.mean(loss_batch))
+			self.training_acc.append(np.mean(acc_batch))
+			self.validation_step()
+			
+			print(f"epoch {i+1}/{self.epoch} - loss: {self.training_loss[i]} - val_loss: {self.validation_loss[i]} - accuracy: {self.training_acc[i]} - val_accuracy: {self.validation_acc[i]}")
+			
+			#Early Stopping
+			if (EarlyStop and EarlyStop(self.validation_loss[i])):
+				print(f"Early Stopping at epoch {i+1} (Patience {EarlyStop.patience})")
+				break
+
 			i += 1
-		print(f"Final prediction:\n{prediction}")
 
 	def feed_forward(self, data):
 		prediction = data
 		for layer in self.layer_list:
-			# print(f"prediction.shape : {prediction.shape}")
-			# print(f"layer.weight.shape : {layer.weight.shape}")
 			layer.z = prediction @ layer.weight.T + layer.bias
-			# print(f"layer.z.shape : {layer.z.shape}")
-			prediction = layer.activation_function(layer.z)
+			if layer.activation_function == ReLU:
+				prediction = layer.z.ReLU()
+			elif layer.activation_function == softmax:
+				prediction = softmax(layer.z)
 			layer.prediction = prediction
-			# print(f"2 prediction.shape : {layer.z.shape}")
-		print("End of feed forward \n")
 		return (prediction)
 
-	def back_propagation(self, prediction, lr):
-		loss = self.loss_function(prediction, self.y)
-
-		# Output Layer 
-		previous_layer = self.layer_list[-1]
-		da = previous_layer.activation_function_dx(previous_layer.z)
-		dLoss = self.loss_function_dx(self.y, previous_layer.prediction)
-		if (da.ndim > 2) : #(previous_layer.activation_function_dx() == "Matrix"):
-			previous_layer.delta = np.squeeze(dLoss[:, np.newaxis, :] @ da)
-		else:
-			previous_layer.delta = dLoss * da
-		
-		# Hidden Layer
-		for i in reversed(range(len(self.layer_list))):
-			hidden_layer = self.layer_list[i]
-
-			if (i == 0):
-				layer_input = self.data
-			else :
-				layer_input = self.layer_list[i - 1].prediction
-			# hidden_layer.delta = previous_layer.delta @ previous_layer.	* hidden_layer.activation_function_dx(hidden_layer.z)
-			grad_W = hidden_layer.delta.T @ layer_input / len(self.data)
-			grad_B = np.sum(hidden_layer.delta, axis=0) / len(self.data)
-			if (i > 0):
-				prev_layer = self.layer_list[i-1]
-				# Chain Rule: (Current Delta @ Current Weights) * Derivative of previous activation
-				prev_layer.delta = (hidden_layer.delta @ hidden_layer.weight) * prev_layer.activation_function_dx(prev_layer.z)
-			hidden_layer.weight = hidden_layer.weight - (lr * grad_W)
-			hidden_layer.bias = hidden_layer.bias - lr * grad_B
-			if np.all(grad_W == 0):
-				print(f"⚠️ Layer {i} gradient is ZERO. Weights won't move.")
-		# print(f"Gradient_W = {grad_W}")
+	def back_propagation(self, lr):
+		for p in self.parameters():
+			p.number += -lr * p._grad
 
 	def validation_step(self):
-		prediction = self.feed_forward(self, self.data_val)
-		loss = self.loss_function(prediction, self.y_val)
-		return loss
+		data_val, y_val = self.dataloader.val_dataloader()
 
-#------------------------------Loss Function------------------------------------#
+		prediction = self.feed_forward(Value(data_val.astype(np.float64)))
+		loss = self.loss_function(prediction, Value(y_val.astype(np.float64)))
+		self.validation_loss.append(loss.number)
 
-def distance(x, y):
-    return (y - x) ** 2
+		pred_labels = prediction.number.argmax(axis=1)
+		true_labels = y_val.argmax(axis=1)
+		self.validation_acc.append((pred_labels == true_labels).mean())
 
-def distance_dx(x, y):
-    """ Partial Derivative of the loss function distance along the x variable"""
-    return (2 * (y - x))
+	def parameters(self):
+		return [p for layer in self.layer_list for p in layer.parameters()]
 
-def binary_cross_entropy(y, x):
-	ep = 1e-6
-	return (-(y * np.log(x + ep) + (1 - y) * np.log(1 - x + ep)))
+	def show_graph(self):
+		Path("graphs").mkdir(exist_ok=True)
+		plt.plot(self.training_loss, label='Training Loss')
+		plt.plot(self.validation_loss, label='Validation Loss')
+		plt.legend()
+		plt.xlabel("epoch")
+		plt.ylabel("Loss")
+		plt.savefig("graphs/graph.png")
+		plt.show()
+		plt.clf()
+		plt.plot(self.validation_acc, label='Validation accuracy')
+		plt.plot(self.training_acc, label='Training accuracy')
+		plt.legend()
+		plt.xlabel("epoch")
+		plt.ylabel("Accuracy")
+		plt.savefig("graphs/graph2.png")
+		plt.show()
 
-def binary_cross_entropy_dx(y, x):
-	ep = 1e-6
-	return ((x - y) / (x * (1 - x) + ep))
+	def export_npz(self):
+		weight = []
+		bias = []
+		topology = []
+		activation_function = []
+		for layer in self.layer_list:
+			weight.append(layer.weight.number)
+			bias.append(layer.bias.number)
+			topology.append(layer.nb_neuron)
+			activation_function.append(layer.activation_function)
+		np.savez("artefacts.npz", 
+			weight=np.array(weight, dtype=object),
+			bias=np.array(bias, dtype=object),
+			topology=np.array(topology),
+			activation_function=np.array(activation_function, dtype=object),
+			mean=self.dataloader.data_mean,
+			std=self.dataloader.data_std)
+		return
 
-#------------------------------Activation Function------------------------------#
+class MLPDataLoader():
+	"""
+	Simple Dataloader (load data and normalize in init)
+	Usage: MLPDataLoader(data, test_ratio, val_ratio, shuffle=True)
+	"""
+	def __init__(self, data_train, data_val, shuffle=True):
+		print(f"data_train : {data_train.shape}")
+		self.features_train = data_train.iloc[:,:-2].values.astype(np.float64)
+		self.y_train = data_train.iloc[:,-2:].values.astype(np.float64)
 
-def softmax(x):																#X being entire Z (Matrix with all input)
-	exp_x = np.exp(x - np.max(x, axis=1))								#To avoid big exponential
-	return exp_x/np.sum(exp_x, axis=1)
+		self.features_val = data_val.iloc[:, :-2].values.astype(np.float64)
+		self.y_val = data_val.iloc[:, -2:].values.astype(np.float64)
 
-#Derivation of soft max :
-def softmax_dx(x):
-	s = softmax(x)
-	batch, n = s.shape
-	jac = np.zeros((batch, n, n))
-	for i in range(batch):
-		row = s[i]
-		jac[i] = np.diagflat(row) - row @ row.T
-	return jac
+		self.shuffle = shuffle
 
-#------------------------------Activation Function------------------------------#
-	
-def ReLU(x):
-	return np.maximum(0, x)
+		self.data_mean = np.mean(self.features_train, axis=0)
+		self.data_std = np.std(self.features_train, axis=0) + 1e-8
+		self.features_train = (self.features_train - self.data_mean) / self.data_std
+		self.features_val = (self.features_val - self.data_mean) / self.data_std
 
-def ReLU_dx(x):
-    """ Derivative of the ReLU function """
-    return ((np.array(x) > 0).astype(int))
+	def train_dataloader(self):
+		if (self.shuffle == True):
+			indices = np.random.permutation(len(self.features_train))
+			np.random.shuffle(indices)
+			self.features_train = self.features_train[indices]
+			self.y_train = self.y_train[indices]
+		data = [self.features_train, self.y_train]
+		return data
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-def sigmoid_dx(x):
-	s = sigmoid(x)
-	return s * (1 - s)
-
-#--------------------------------Main--------------------------------------#
+	def val_dataloader(self):
+		if (self.shuffle == True):
+			indices = np.random.permutation(len(self.features_val))
+			np.random.shuffle(indices)
+			self.features_val = self.features_val[indices]
+			self.y_val = self.y_val[indices]
+		data = [self.features_val, self.y_val]
+		return data
 
 # python train.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy --batch_size 8 --learning_rate 0.0314
-
+# python train.py --layer 16 8 8 --epochs 130 --loss binaryCrossentropy --batch_size 8 --learning_rate 0.01 --early_stopping 100
 def main():
-	parser = argparse.ArgumentParser()
+	parser = argparse.ArgumentParser(prog="MLP",
+		description="""Small MLP from scratch (numpy), can modify numbers of layers, epoch, batch size, learning rate,
+optimizer and earlystopping with the args of the program. You can also modify more EarlyStopping parameters directly in the code""",
+		epilog="Code by Ragulan (Github: RagulanGn, Discord: .ragux)")
 
 	parser.add_argument("--layer", nargs="+", type=int, help="List of number of neuron in each layer", required=True)
 	parser.add_argument("--epochs", type=int, help="Number of epoch", required=True)
-	parser.add_argument("--loss", type=str, help="Lost function used", required=True)
+	parser.add_argument("--loss", type=str, choices=["binaryCrossentropy"], help="Lost function used", required=True)
 	parser.add_argument("--batch_size", type=int, help="Size of batch", required=True)
 	parser.add_argument("--learning_rate", type=float, help="learning rate", required=True)
+	parser.add_argument("--optimizer", type=str, choices=["Nesterov", "Adam"], help="Optimizer choice between Nesterov or Adam")
+	parser.add_argument("--early_stopping", type=int, help="Early stopping patience")
 	args = parser.parse_args()
 
-	df = pd.read_csv("data_train.csv")
-	y = df.iloc[:,-2:]
-	data = df.iloc[:,:-2]			#maybe drop also 0 i think its the id
-	if args.loss == "categoricalCrossentropy":
-		perceptron = model(loss_function=binary_cross_entropy, loss_function_dx=binary_cross_entropy_dx, epoch=args.epochs, data=data, y=y)
-	for i in args.layer:
-		perceptron.add_layer(i, sigmoid, sigmoid_dx)
-	perceptron.add_layer(i, softmax, softmax_dx) #output layer
+	try:
+		df_train = pd.read_csv("datasets/data_train.csv")
+		df_val = pd.read_csv("datasets/data_val.csv")
+	except Exception as e:
+		parser.error(str(e))
 
-	perceptron.train()
+	dataloader = MLPDataLoader(df_train, df_val)
+
+	if args.loss == "binaryCrossentropy":
+		MLP = model(
+		epoch=args.epochs, 
+		batch_size=args.batch_size, 
+		learning_rate=args.learning_rate,
+		dataloader=dataloader,
+		loss_function=binary_cross_entropy)
+
+	optimizer = None
+	if args.optimizer == "Adam":
+		optimizer = Adam(lr=10e-3, b1=0.9, b2=0.99)
+	if args.optimizer == "Nesterov":
+		optimizer = NesterovMomentum(lr=10e-3, b1=0.9)
+
+	EarlyStop = None
+	if args.early_stopping:
+		EarlyStop = EarlyStopping(patience=args.early_stopping, min_delta=0.0, mode='min')
+	for i in args.layer:
+		MLP.add_layer(i, ReLU)
+	MLP.add_layer(2, softmax)
+
+	MLP.train(EarlyStop=EarlyStop, optimizer=optimizer)
+	MLP.show_graph()
+	MLP.export_npz()
 	return
 
 if __name__ == "__main__":
     main()
-    
-#Split data
-	#split data
-
-#train
-	#Compute weight (training)
-	#Plot Loss and accuracy (for val and train)
-	#Save weight + mean and std + argv
-
-#predict
-	#Predict the result
