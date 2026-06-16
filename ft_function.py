@@ -8,7 +8,6 @@ def distance(experiment, truth):
 
 def binary_cross_entropy(prediction: Value, truth: Value) -> Value:
 	loss = -(truth * prediction.log() + (1.0 - truth) * (1.0 - prediction).log()).sum()
-	# print(f"loss : {loss.number}")
 	return loss * (1.0 / prediction.number.shape[0])
 
 def binary_cross_entropy_no_grad(prediction: float, truth: float) -> float:
@@ -46,9 +45,6 @@ def softmax_nograd(x):#X being entire Z (Matrix with all input)
 def ReLU(x):
 	return np.maximum(0, x)
 
-# def sigmoid(x):
-#     return 1 / (1 + np.exp(-x))
 def sigmoid(x):
-    # Use np.where to handle the batch (array) all at 
     x = np.clip(x, -50, 50)
     return 1 / (1 + np.exp(-x))

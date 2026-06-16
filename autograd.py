@@ -201,8 +201,6 @@ def main():
 	list_grad = []
 	head = v5
 
-	import numpy as np
-
 	head.backward()
 	print(f"head : {head._grad}")
 	print(f"v1 : {v1._grad}")
@@ -210,11 +208,6 @@ def main():
 	print(f"v3 : {v3._grad}")
 	print(f"v4 : {v4._grad}")
 	print(f"v5 : {v5._grad}")
- 
-	# for v in value_list:
-		# v._backward()
-		# print(v)
-		# print(v._grad)
 
 if __name__ == "__main__":
 	main()
