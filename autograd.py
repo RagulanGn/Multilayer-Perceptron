@@ -188,26 +188,3 @@ class Value:
 			self._grad += (np.ones_like(self.number) * grad_reshaped) / N
 		m._backward = _backward
 		return m
-
-
-def main():
-	v1 = Value(10)
-	v2 = Value(15)
-	v3 = Value(3)
-	v4 = v2 * v1
-	v5 = v4 / v3
-
-	#Construct list to iterate on
-	list_grad = []
-	head = v5
-
-	head.backward()
-	print(f"head : {head._grad}")
-	print(f"v1 : {v1._grad}")
-	print(f"v2 : {v2._grad}")
-	print(f"v3 : {v3._grad}")
-	print(f"v4 : {v4._grad}")
-	print(f"v5 : {v5._grad}")
-
-if __name__ == "__main__":
-	main()
