@@ -17,13 +17,14 @@ class Layer():
 		return [self.weight, self.bias]
 
 class MLP():
-	def __init__(self, epoch=None, learning_rate=None, batch_size=None, dataloader=None, loss_function=None):
+	def __init__(self, epoch=None, learning_rate=None, batch_size=None, dataloader=None, loss_function=None, loss_name=None):
 		self.layer_list = []
 		self.epoch = epoch
 		self.learning_rate = learning_rate
 		self.batch_size = batch_size
 		self.dataloader = dataloader
 		self.loss_function = loss_function
+		self.loss_name = loss_name
 
 		self.validation_loss = []
 		self.training_loss = []
@@ -55,7 +56,7 @@ class MLP():
 					p._grad = np.zeros_like(p.number)
 
 				loss.backward()
-				if optimizer == None :
+				if optimizer is None :
 					self.back_propagation(self.learning_rate)
 				else :
 					optimizer(self.parameters())
@@ -147,19 +148,14 @@ class MLP():
 			weight=np.array(weight, dtype=object),
 			bias=np.array(bias, dtype=object),
 			topology=np.array(topology),
-			loss_function=self.loss_function,
+			loss_name=self.loss_name,
 			activation_function=np.array(activation_function, dtype=object),
 			mean=self.dataloader.data_mean,
 			std=self.dataloader.data_std)
 		return
 
 class MLPDataLoader():
-	"""
-	Simple Dataloader (load data and normalize in init)
-	Usage: MLPDataLoader(data, test_ratio, val_ratio, shuffle=True)
-	"""
 	def __init__(self, data_train, data_val, shuffle=True):
-		print(f"data_train : {data_train.shape}")
 		self.features_train = data_train.iloc[:,:-2].values.astype(np.float64)
 		self.y_train = data_train.iloc[:,-2:].values.astype(np.float64)
 

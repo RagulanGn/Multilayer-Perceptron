@@ -43,11 +43,12 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 	batch_size=args.batch_size, 
 	learning_rate=args.learning_rate,
 	dataloader=dataloader,
-	loss_function=loss)
+	loss_function=loss,
+	loss_name=args.loss)
 
 	optimizer = None
 	if args.optimizer == "Adam":
-		optimizer = Adam(args.learning_rate, b1=0.9, b2=0.99)
+		optimizer = Adam(args.learning_rate, b1=0.9, b2=0.999)
 	if args.optimizer == "Nesterov":
 		optimizer = NesterovMomentum(args.learning_rate, b1=0.9)
 
