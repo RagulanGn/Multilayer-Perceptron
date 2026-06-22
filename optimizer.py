@@ -1,7 +1,7 @@
 import numpy as np
 
 class NesterovMomentum():
-	def __init__(self, lr=10e-3, b1=0.9):
+	def __init__(self, lr=1e-3, b1=0.9):
 		self.lr = lr
 		self.b1 = b1
 		self.m = {} #Dictionnary of all momentum for each p (parameters)
@@ -16,7 +16,7 @@ class NesterovMomentum():
 			p.number -= self.lr * (self.b1 * self.m[p] + grad)
 
 class Adam():
-	def __init__(self, lr=10e-3, b1=0.9, b2=0.99):	
+	def __init__(self, lr=1e-3, b1=0.9, b2=0.99):
 		self.lr = lr	#Learning rate
 		self.b1 = b1	#ratio of Momentum according to previous gradient
 		self.b2 = b2	#ratio of Second Momentum according to variance of the gradient
