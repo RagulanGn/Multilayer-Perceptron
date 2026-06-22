@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
-datasets/
-!datasets/data.csv
+datasets/data_*
+datasets/describe.csv
 graphs/
 artefacts.npz
