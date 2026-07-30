@@ -4,7 +4,6 @@ import numpy as np
 from ft_function import binary_cross_entropy_no_grad, categorical_cross_entropy_no_grad
 from network import MLP
 
-FEATURES_NB = 30
 
 def main():
 	parser = argparse.ArgumentParser()
@@ -17,25 +16,24 @@ def main():
 	except Exception as e:
 		parser.error(str(e))
 
+	if (not all(pd.api.types.is_numeric_dtype(dtype) for dtype in df_test.dtypes)):
+		print("Non numeric colums detectected on test dataset")
+		return
+
 	MLPpredict = MLP()
 	for i in range(len(npz_file['topology'])):
 		MLPpredict.add_layer(npz_file['topology'][i][0], npz_file['topology'][i][1], npz_file['activation_function'][i], npz_file['weight'][i], npz_file['bias'][i])
 
-	if df_test.shape[1] == FEATURES_NB:
-		df_test = (df_test - npz_file['mean']) / npz_file['std']
-		prediction = MLPpredict.feed_forward_no_grad(df_test)
-		print(prediction)
-	else :
-		df_real = df_test.iloc[:,-2:].values.astype(np.float64)
-		df_test = df_test.iloc[:,:-2].values.astype(np.float64)
-		df_test = (df_test - npz_file['mean']) / npz_file['std']
+	df_real = df_test.iloc[:,-2:].values.astype(np.float64)
+	df_test = df_test.iloc[:,:-2].values.astype(np.float64)
+	df_test = (df_test - npz_file['mean']) / npz_file['std']
 
-		prediction = MLPpredict.feed_forward_no_grad(df_test)
-		if npz_file['loss_name'] == 'binaryCrossentropy' :
-			loss = binary_cross_entropy_no_grad(prediction, df_real)
-		else :
-			loss = categorical_cross_entropy_no_grad(prediction, df_real)
-		print(loss)
+	prediction = MLPpredict.feed_forward_no_grad(df_test)
+	if npz_file['loss_name'] == 'binaryCrossentropy' :
+		loss = binary_cross_entropy_no_grad(prediction, df_real)
+	else :
+		loss = categorical_cross_entropy_no_grad(prediction, df_real)
+	print(loss)
 
 if __name__ == "__main__":
 	main()

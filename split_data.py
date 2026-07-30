@@ -1,9 +1,15 @@
 import pandas as pd
 import sys
+import argparse
 #Split data finished a lot of the work is in the dataloader on the train.py file
 
 def main():
 	"Read the data.csv, and separate the dataset into two, training and validation with 80/20 ratio"
+	parser = argparse.ArgumentParser()
+	parser.add_argument("--train_dataset", type=str, help="Path of train dataset", default="datasets/data_train.csv")
+	parser.add_argument("--val_dataset", type=str, help="Path of val dataset", default="datasets/data_val.csv")
+	args = parser.parse_args()
+
 	try : 
 		df = pd.read_csv("datasets/data.csv", header=None)
 	except Exception as e:
@@ -22,8 +28,8 @@ def main():
 	df_val = df[int(0.8 * len(df.index)):]
 
 	#Export to csv
-	df_train.to_csv("datasets/data_train.csv", index=False)
-	df_val.to_csv("datasets/data_val.csv", index=False)
+	df_train.to_csv(args.train_dataset, index=False)
+	df_val.to_csv(args.val_dataset, index=False)
 	return
 
 if __name__ == "__main__":

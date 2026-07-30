@@ -2,10 +2,6 @@
 
 MLP classifier built from scratch in NumPy, trained on the Wisconsin Breast Cancer dataset to predict malignant vs. benign tumors.
 
-## Why it exists
-
-No PyTorch, no TensorFlow — the goal is to implement the full forward/backward pass, including a custom autograd engine, optimizers, and training loop, using only NumPy. The dataset is a fixed binary classification problem (30 features → 2 classes) used to validate correctness.
-
 ## Architecture overview
 
 ```
@@ -34,7 +30,7 @@ The autograd engine (`Value`) wraps NumPy arrays (not scalars), so all operation
 ## Install
 
 ```bash
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 Python 3.12 assumed (that's what the `__pycache__` bytecode targets).
@@ -44,7 +40,7 @@ Python 3.12 assumed (that's what the `__pycache__` bytecode targets).
 ### 1. Prepare the dataset
 
 ```bash
-python split_data.py
+uv run split_data.py
 ```
 
 Reads `datasets/data.csv` (Wisconsin Breast Cancer, no header), drops the ID column, one-hot encodes the M/B label, shuffles with seed 42, and writes an 80/20 train/val split to `datasets/data_train.csv` and `datasets/data_val.csv`.
@@ -52,7 +48,7 @@ Reads `datasets/data.csv` (Wisconsin Breast Cancer, no header), drops the ID col
 ### 2. Train
 
 ```bash
-python train.py --layer <neurons...> --epochs <n> --loss <fn> --batch_size <n> --learning_rate <lr> [--optimizer <opt>] [--early_stopping <patience>]
+uv run train.py --layer <neurons...> --epochs <n> --loss <fn> --batch_size <n> --learning_rate <lr> [--optimizer <opt>] [--early_stopping <patience>]
 ```
 
 **Required arguments**
@@ -72,12 +68,12 @@ python train.py --layer <neurons...> --epochs <n> --loss <fn> --batch_size <n> -
 | `--optimizer` | `Adam` \| `Nesterov` | Optimizer (default: vanilla SGD) |
 | `--early_stopping` | int | Stop after this many epochs without val_loss improvement |
 
-**Examples from code comments**
+**Examples**
 
 ```bash
-python train.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy --batch_size 8 --learning_rate 0.0314
+uv run train.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy --batch_size 8 --learning_rate 0.0314
 
-python train.py --layer 16 8 8 --epochs 130 --loss binaryCrossentropy --batch_size 8 --learning_rate 0.01 --early_stopping 100
+uv run train.py --layer 16 8 8 --epochs 130 --loss binaryCrossentropy --batch_size 8 --learning_rate 0.01 --early_stopping 100
 ```
 
 Training prints per-epoch metrics and saves:
@@ -88,7 +84,7 @@ Training prints per-epoch metrics and saves:
 ### 3. Predict
 
 ```bash
-python predict.py <csv_file>
+uv run predict.py <csv_file>
 ```
 
 If the CSV has fewer than 31 columns (raw features only), it prints the softmax probability vector for each sample.
@@ -113,17 +109,3 @@ graphs/            — Loss and accuracy plots saved after training
 artefacts.npz      — Serialized model produced by train.py, consumed by predict.py
 requirements.txt   — numpy, pandas, matplotlib
 ```
-
-## Key design decisions
-
-**Batch-native autograd.** Unlike scalar autograd engines (e.g. micrograd), `Value` wraps full NumPy arrays. This means a single matrix multiply in feed_forward covers the entire batch, and `_unbroadcast` handles gradient shape correction when broadcasting occurred during the forward pass.
-
-**Architecture is fixed at 2 outputs.** `train.py` always appends `2` as the last layer size (`[features_len, *hidden_layers, 2]`), with softmax activation. The hidden layers use ReLU.
-
-**Weight initialization.** Weights are drawn from `Normal(0, sqrt(2 / (in + out)))` — a Xavier/Glorot variant. Biases are zero-initialized.
-
-**Normalization stored in artefacts.** The training set mean and std are saved into `artefacts.npz` so `predict.py` applies the identical transform without access to training data.
-
-**Two forward paths.** `feed_forward` uses `Value` objects (grad tracking, used during training and validation loss). `feed_forward_no_grad` uses plain NumPy (used in `predict.py` — no graph built, no memory overhead).
-
-**Loss function serialized by name.** `artefacts.npz` stores `loss_function` as the Python function object via `allow_pickle=True`. `predict.py` checks the string name (`'binaryCrossentropy'`) to dispatch to the correct no-grad variant.

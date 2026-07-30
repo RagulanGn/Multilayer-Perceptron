@@ -8,14 +8,14 @@ from optimizer import NesterovMomentum, Adam
 from network import MLP, MLPDataLoader
 
 np.random.seed(42) #Set the seed for the whole project
-
+FEATURES_NB = 30
 # python train.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy --batch_size 8 --learning_rate 0.0314
 # python train.py --layer 16 8 8 --epochs 130 --loss binaryCrossentropy --batch_size 8 --learning_rate 0.01 --early_stopping 100
 def main():
-	parser = argparse.ArgumentParser(prog="MLP",
+	parser = argparse.ArgumentParser(prog="train",
 		description="""Small MLP from scratch (numpy), can modify numbers of layers, epoch, batch size, learning rate,
 optimizer and earlystopping with the args of the program. You can also modify more EarlyStopping parameters directly in the code""",
-		epilog="Code by Ragulan (Github: RagulanGn, Discord: .ragux)")
+		epilog="Code by Ragulan (Github: RagulanGn)")
 
 	parser.add_argument("--layer", nargs="+", type=int, help="List of number of neuron in each layer", required=True)
 	parser.add_argument("--epochs", type=int, help="Number of epoch", required=True)
@@ -24,13 +24,22 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 	parser.add_argument("--learning_rate", type=float, help="learning rate", required=True)
 	parser.add_argument("--optimizer", type=str, choices=["Nesterov", "Adam"], help="Optimizer choice between Nesterov or Adam")
 	parser.add_argument("--early_stopping", type=int, help="Early stopping patience")
+	parser.add_argument("--train_dataset", type=str, help="Path of train dataset", default="datasets/data_train.csv")
+	parser.add_argument("--val_dataset", type=str, help="Path of val dataset", default="datasets/data_val.csv")
 	args = parser.parse_args()
 
 	try:
-		df_train = pd.read_csv("datasets/data_train.csv")
-		df_val = pd.read_csv("datasets/data_val.csv")
+		df_train = pd.read_csv(args.train_dataset)
+		df_val = pd.read_csv(args.val_dataset)
 	except Exception as e:
 		parser.error(str(e))
+
+	if (not all(pd.api.types.is_numeric_dtype(dtype) for dtype in df_train.dtypes)):
+		print("Non numeric colums detectected on train dataset")
+		return
+	if (not all(pd.api.types.is_numeric_dtype(dtype) for dtype in df_val.dtypes)):
+		print("Non numeric colums detectected on val dataset")
+		return
 
 	dataloader = MLPDataLoader(df_train, df_val)
 
