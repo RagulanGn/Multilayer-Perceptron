@@ -52,6 +52,10 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 	if args.optimizer == "Nesterov":
 		optimizer = NesterovMomentum(args.learning_rate, b1=0.9)
 
+	if (len(args.layer) < 2):
+		print("Need atleast 2 hidden layers")
+		return
+
 	EarlyStop = None
 	if args.early_stopping:
 		EarlyStop = EarlyStopping(patience=args.early_stopping, min_delta=0.0, mode='min')
