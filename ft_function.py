@@ -6,30 +6,17 @@ from autograd import Value
 def distance(prediction, truth):
 	return (truth - prediction) ** 2
 
-def binary_cross_entropy(prediction: Value, truth: Value) -> Value:
-	loss = -(truth * prediction.log() + (1.0 - truth) * (1.0 - prediction).log()).sum()
-	return loss * (1.0 / prediction.number.shape[0])
-
-def binary_cross_entropy_no_grad(prediction: float, truth: float) -> float:
+def binary_cross_entropy(prediction: float, truth: float) -> float:
 	loss = -(truth * np.log(prediction) + (1.0 - truth) * np.log(1.0 - prediction)).sum()
 	return loss * (1.0 / prediction.shape[0])
 
 def categorical_cross_entropy(prediction, truth):
-	loss = -(truth * prediction.log()).sum()
-	return loss * (1.0 / prediction.number.shape[0])
-
-def categorical_cross_entropy_no_grad(prediction, truth):
 	loss = -(truth * np.log(prediction)).sum()
 	return loss * (1.0 / prediction.shape[0])
 
 #------------------------------Activation Function------------------------------#
 
 def softmax(x):
-	exp_x = (x - np.max(x.number, axis=1, keepdims=True)).exp()
-	return exp_x / exp_x.sum(axis=1, keepdims=True)
-
-def softmax_nograd(x):
-	x = np.array(x)
 	exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
 	return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
@@ -39,3 +26,6 @@ def ReLU(x):
 def sigmoid(x):
 	x = np.clip(x, -50, 50)
 	return 1 / (1 + np.exp(-x))
+
+def ReLU(x):
+	return x * (x > 0)
