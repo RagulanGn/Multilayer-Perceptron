@@ -1,3 +1,4 @@
+import matplotlib
 import pandas as pd
 import numpy as np
 import argparse
@@ -8,9 +9,17 @@ from optimizer import NesterovMomentum, Adam
 from network import MLP, MLPDataLoader
 
 np.random.seed(42) #Set the seed for the whole project
-FEATURES_NB = 30
-# python train.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy --batch_size 8 --learning_rate 0.0314
-# python train.py --layer 16 8 8 --epochs 130 --loss binaryCrossentropy --batch_size 8 --learning_rate 0.01 --early_stopping 100
+
+LOSS_FUNCTIONS = {
+	"binaryCrossentropy": binary_cross_entropy,
+	"categoricalCrossentropy": categorical_cross_entropy
+}
+
+OPTIMIZERS = {
+	"Nesterov": NesterovMomentum,
+	"Adam": Adam
+}
+
 def main():
 	parser = argparse.ArgumentParser(prog="train",
 		description="""Small MLP from scratch (numpy), can modify numbers of layers, epoch, batch size, learning rate,
@@ -26,27 +35,22 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 	parser.add_argument("--early_stopping", type=int, help="Early stopping patience")
 	parser.add_argument("--train_dataset", type=str, help="Path of train dataset", default="datasets/data_train.csv")
 	parser.add_argument("--val_dataset", type=str, help="Path of val dataset", default="datasets/data_val.csv")
+	parser.add_argument("--hide_graphs", action="store_false", help="Hide all graphs (Still saved)")
 	args = parser.parse_args()
 
 	try:
-		df_train = pd.read_csv(args.train_dataset)
-		df_val = pd.read_csv(args.val_dataset)
+		df_train = pd.read_csv(args.train_dataset, header=None, index_col=0)
+		df_val = pd.read_csv(args.val_dataset, header=None, index_col=0)
 	except Exception as e:
 		parser.error(str(e))
 
-	if (not all(pd.api.types.is_numeric_dtype(dtype) for dtype in df_train.dtypes)):
-		print("Non numeric colums detectected on train dataset")
-		return
-	if (not all(pd.api.types.is_numeric_dtype(dtype) for dtype in df_val.dtypes)):
-		print("Non numeric colums detectected on val dataset")
-		return
+	df_val = pd.get_dummies(df_val, columns=[1], dtype=int)
+	df_train = pd.get_dummies(df_train, columns=[1], dtype=int)
 
 	dataloader = MLPDataLoader(df_train, df_val)
 
-	if args.loss == "binaryCrossentropy":
-		loss = binary_cross_entropy
-	else:
-		loss = categorical_cross_entropy
+	loss = LOSS_FUNCTIONS[args.loss]
+	
 	model = MLP(
 	epoch=args.epochs, 
 	batch_size=args.batch_size, 
@@ -56,14 +60,12 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 	loss_name=args.loss)
 
 	optimizer = None
-	if args.optimizer == "Adam":
-		optimizer = Adam(args.learning_rate, b1=0.9, b2=0.999)
-	if args.optimizer == "Nesterov":
-		optimizer = NesterovMomentum(args.learning_rate, b1=0.9)
+	if args.optimizer :
+		OPTIMIZERS[args.optimizer](args.learning_rate)
 
 	if (len(args.layer) < 2):
-		print("Need atleast 2 hidden layers")
-		return
+		print(f"Need atleast 2 hidden layers, default to [8, 8]")
+		args.layer = [8, 8]
 
 	EarlyStop = None
 	if args.early_stopping:
@@ -75,8 +77,11 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 		model.add_layer(layers_sizes[i], layers_sizes[i + 1], activation_function)
 
 	model.train(EarlyStop=EarlyStop, optimizer=optimizer)
-	model.show_graph()
+	model.show_graph(args.hide_graphs)
 	model.export_npz()
+	model.save_metrics()
+	model.show_graph_model_comparison(args.hide_graphs)
+
 	return
 
 if __name__ == "__main__":
