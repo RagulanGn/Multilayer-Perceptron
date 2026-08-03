@@ -3,4 +3,5 @@ __pycache__/
 datasets/data_*
 datasets/describe.csv
 graphs/
+artefacts/
 artefacts.npz
