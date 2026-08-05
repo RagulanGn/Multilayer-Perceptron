@@ -74,6 +74,8 @@ uv run train.py --layer <neurons...> --epochs <n> --loss <fn> --batch_size <n> -
 uv run train.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy --batch_size 8 --learning_rate 0.0314
 
 uv run train.py --layer 16 8 8 --epochs 130 --loss binaryCrossentropy --batch_size 8 --learning_rate 0.01 --early_stopping 100
+
+uv run train.py --layer 32 12 16 --epochs 800 --loss binaryCrossentropy --batch_size 16 --learning_rate 0.01 --optimizer Adam --early_stopping 10 --hide_graphs
 ```
 
 Training prints per-epoch metrics and saves:

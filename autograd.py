@@ -204,7 +204,7 @@ class Value:
 			s._backward = _backward
 		return s
 
-	def mean(self, axis=None, keepdims=False, out=None):
+	def mean(self, axis=None, keepdims=False, out=None, dtype=None):
 		m = Value(self.number.mean(axis=axis, keepdims=keepdims))
 
 		if axis is None:

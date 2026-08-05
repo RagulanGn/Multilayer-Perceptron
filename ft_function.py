@@ -7,12 +7,14 @@ def distance(prediction, truth):
 	return (truth - prediction) ** 2
 
 def binary_cross_entropy(prediction: float, truth: float) -> float:
-	loss = -(truth * np.log(prediction) + (1.0 - truth) * np.log(1.0 - prediction)).sum()
-	return loss * (1.0 / prediction.shape[0])
+	eps = 1e-15
+	loss = -np.mean((truth * np.log(prediction + eps) + (1.0 - truth) * np.log(1.0 - prediction + eps)))
+	return loss 
 
 def categorical_cross_entropy(prediction, truth):
-	loss = -(truth * np.log(prediction)).sum()
-	return loss * (1.0 / prediction.shape[0])
+	eps = 1e-15
+	loss = -np.mean(truth * np.log(prediction + eps))
+	return loss
 
 #------------------------------Activation Function------------------------------#
 
