@@ -247,4 +247,4 @@ class Value:
 				count = mask.sum(axis=axis, keepdims=True)
 				self._grad += (mask / count) * grad_reshaped
 			m._backward = _backward
-			return m
+		return m
