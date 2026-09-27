@@ -5,10 +5,8 @@ import argparse
 
 from ft_function import binary_cross_entropy, categorical_cross_entropy
 from early_stopping import EarlyStopping
-from optimizer import NesterovMomentum, Adam
+from optimizer import NesterovMomentum, Adam, AdamW
 from network import MLP, MLPDataLoader
-
-np.random.seed(42) #Set the seed for the whole project
 
 LOSS_FUNCTIONS = {
 	"binaryCrossentropy": binary_cross_entropy,
@@ -36,7 +34,10 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 	parser.add_argument("--train_dataset", type=str, help="Path of train dataset", default="datasets/data_train.csv")
 	parser.add_argument("--val_dataset", type=str, help="Path of val dataset", default="datasets/data_val.csv")
 	parser.add_argument("--hide_graphs", action="store_false", help="Hide all graphs (Still saved)")
+	parser.add_argument("--seed", type=int, default=42, help="Random seed")
 	args = parser.parse_args()
+
+	np.random.seed(args.seed)
 
 	try:
 		df_train = pd.read_csv(args.train_dataset, header=None, index_col=0)
@@ -61,7 +62,7 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 
 	optimizer = None
 	if args.optimizer :
-		OPTIMIZERS[args.optimizer](args.learning_rate)
+		optimizer = OPTIMIZERS[args.optimizer](args.learning_rate)
 
 	if (len(args.layer) < 2):
 		print(f"Need atleast 2 hidden layers, default to [8, 8]")
@@ -78,7 +79,7 @@ optimizer and earlystopping with the args of the program. You can also modify mo
 
 	model.train(EarlyStop=EarlyStop, optimizer=optimizer)
 	model.show_graph(args.hide_graphs)
-	model.export_npz()
+	model.save_model()
 	model.save_metrics()
 	model.show_graph_model_comparison(args.hide_graphs)
 

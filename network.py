@@ -18,7 +18,7 @@ class Layer():
 	def __init__(self, in_size, out_size, activation_function, weight, bias):
 		self.in_size = in_size
 		self.out_size = out_size
-		self.weight = weight if weight is not None else Value(np.random.normal(0, np.sqrt(2 / (in_size + out_size)), size=(out_size, in_size)))
+		self.weight = weight if weight is not None else Value(np.random.normal(0, np.sqrt(2 / (in_size)), size=(out_size, in_size)))
 		self.bias = bias if bias is not None else Value(np.zeros(out_size))
 		self.activation_function = activation_function
 
@@ -45,6 +45,8 @@ class MLP():
 		self.validation_rmse = []
 		self.validation_mae = []
 
+		self.best_params = None
+
 	def add_layer(self, in_size, out_size, activation_function, weight=None, bias=None):
 		l = Layer(in_size, out_size, activation_function, weight, bias)
 		self.layer_list.append(l)
@@ -54,11 +56,12 @@ class MLP():
 		i = 0
 		while (i < self.epoch):
 			data, y = self.dataloader.train_dataloader()
-			loss_batch = []
-			acc_batch = []
-			rmse_batch = []
-			mae_batch = []
-			for j in range(0, len(data), self.batch_size):
+			loss_batch = 0
+			acc_batch = 0
+			rmse_batch = 0
+			mae_batch = 0
+			N = len(data)
+			for j in range(0, N, self.batch_size):
 				batch = Value(data[j:j + self.batch_size])
 				batch_y = Value(y[j:j + self.batch_size])
 
@@ -77,28 +80,33 @@ class MLP():
 				else :
 					optimizer(self.parameters())
 				#Appends Metrics
-				loss_batch.append(loss.number)
+				n_batch = len(batch.number)
+				loss_batch += loss.number * n_batch
 				pred_labels = prediction.number.argmax(axis=1)
 				true_labels = batch_y.number.argmax(axis=1)
-				acc_batch.append((pred_labels == true_labels).mean())
-				rmse_batch.append(np.sqrt(np.mean((prediction.number - batch_y.number) ** 2)))
-				mae_batch.append(np.mean(np.abs(prediction.number - batch_y.number)))
+				acc_batch += ((pred_labels == true_labels).sum())
+				rmse_batch += ((prediction.number - batch_y.number) ** 2).sum()
+				mae_batch += (np.abs(prediction.number - batch_y.number)).sum()
 
-			self.training_loss.append(np.mean(loss_batch))
-			self.training_acc.append(np.mean(acc_batch))
-			self.training_rmse.append(np.mean(rmse_batch))
-			self.training_mae.append(np.mean(mae_batch))
+			self.training_loss.append(loss_batch / N)
+			self.training_acc.append(acc_batch / N)
+			self.training_rmse.append(np.sqrt(rmse_batch / N))
+			self.training_mae.append(mae_batch / N)
+	
+			prediction = self.feed_forward(batch)
 			with no_grad():
 				self.validation_step()
 			
 			print(f"epoch {i+1}/{self.epoch} - loss: {self.training_loss[i]} - val_loss: {self.validation_loss[i]} - accuracy: {self.training_acc[i]} - val_accuracy: {self.validation_acc[i]}")
 			
 			#Early Stopping
-			if (EarlyStop and EarlyStop(self.validation_loss[i])):
+			if (EarlyStop and EarlyStop(self.validation_loss[i], [p.number.copy() for p in self.parameters()])):
 				print(f"Early Stopping at epoch {i+1} (Patience {EarlyStop.patience})")
 				break
 
 			i += 1
+		if (EarlyStop):
+			self.best_params = EarlyStop.get_best_params()
 
 	def feed_forward(self, data):
 		prediction = data
@@ -114,12 +122,12 @@ class MLP():
 	def validation_step(self):
 		data_val, y_val = self.dataloader.val_dataloader()
 
-
-		loss_batch = []
-		acc_batch = []
-		rmse_batch = []
-		mae_batch = []
-		for j in range(0, len(data_val), self.batch_size):
+		loss_batch = 0
+		acc_batch = 0
+		rmse_batch = 0
+		mae_batch = 0
+		N = len(data_val)
+		for j in range(0, N, self.batch_size):
 			batch = Value(data_val[j:j + self.batch_size])
 			batch_y = Value(y_val[j:j + self.batch_size])
 	
@@ -128,18 +136,17 @@ class MLP():
 			loss = self.loss_function(prediction, batch_y)
 	
 			#Appends Metrics
-			loss_batch.append(loss.number)
+			n_batch = len(batch.number)
+			loss_batch += loss.number * n_batch
 			pred_labels = prediction.number.argmax(axis=1)
 			true_labels = batch_y.number.argmax(axis=1)
-			acc_batch.append((pred_labels == true_labels).mean())
-			rmse_batch.append(np.sqrt(np.mean((prediction.number - batch_y.number) ** 2)))
-			mae_batch.append(np.mean(np.abs(prediction.number - batch_y.number)))
-		pred_labels = prediction.number.argmax(axis=1)
-		true_labels = y_val.argmax(axis=1)
-		self.validation_loss.append(np.mean(loss_batch))
-		self.validation_acc.append(np.mean(acc_batch))
-		self.validation_rmse.append(np.mean(rmse_batch))
-		self.validation_mae.append(np.mean(mae_batch))
+			acc_batch += (pred_labels == true_labels).sum()
+			rmse_batch += ((prediction.number - batch_y.number) ** 2).sum()
+			mae_batch += (np.abs(prediction.number - batch_y.number)).sum()
+		self.validation_loss.append(loss_batch / N)
+		self.validation_acc.append(acc_batch / N)
+		self.validation_rmse.append(np.sqrt(rmse_batch / N))
+		self.validation_mae.append(mae_batch / N)
 
 	def parameters(self):
 		return [p for layer in self.layer_list for p in layer.parameters()]
@@ -164,19 +171,25 @@ class MLP():
 		self.plot_graph("RMSE", self.training_rmse, self.validation_rmse, show_graph_flag)
 		self.plot_graph("MAE", self.training_mae, self.validation_mae, show_graph_flag)
 
-	def export_npz(self):
-		weight = []
-		bias = []
+	def save_model(self):
+		params = self.best_params or [p.number for p in self.parameters()]
+		weight = params[::2]
+		bias = params[1::2]
+
+		weight_array = np.empty(len(weight), dtype=object)
+		bias_array = np.empty(len(bias), dtype=object)
+
+		weight_array[:] = weight
+		bias_array[:] = bias
+
 		topology = []
 		activation_function = []
 		for layer in self.layer_list:
-			weight.append(layer.weight.number)
-			bias.append(layer.bias.number)
 			topology.append([layer.in_size, layer.out_size])
 			activation_function.append(layer.activation_function)
 		np.savez("artefacts.npz", 
-			weight=np.array(weight, dtype=object),
-			bias=np.array(bias, dtype=object),
+			weight=weight_array,
+			bias=bias_array,
 			topology=np.array(topology),
 			loss_name=self.loss_name,
 			activation_function=np.array(activation_function, dtype=object),

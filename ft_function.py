@@ -6,14 +6,14 @@ from autograd import Value
 def distance(prediction, truth):
 	return (truth - prediction) ** 2
 
-def binary_cross_entropy(prediction: float, truth: float) -> float:
+def binary_cross_entropy(prediction, truth) -> float:
 	eps = 1e-15
 	loss = -np.mean((truth * np.log(prediction + eps) + (1.0 - truth) * np.log(1.0 - prediction + eps)))
 	return loss 
 
 def categorical_cross_entropy(prediction, truth):
 	eps = 1e-15
-	loss = -np.mean(truth * np.log(prediction + eps))
+	loss = -np.sum(truth * np.log(prediction + eps)) / prediction.shape[0]
 	return loss
 
 #------------------------------Activation Function------------------------------#
